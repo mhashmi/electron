@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "atom/renderer/renderer_client_base.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 
 namespace atom {
 
@@ -22,7 +23,7 @@ class AtomRendererClient : public RendererClientBase {
 
   // Get the context that the Electron API is running in.
   v8::Local<v8::Context> GetContext(
-      blink::WebFrame* frame, v8::Isolate* isolate);
+      blink::WebLocalFrame* frame, v8::Isolate* isolate);
 
   // atom::RendererClientBase:
   void DidCreateScriptContext(

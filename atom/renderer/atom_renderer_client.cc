@@ -172,7 +172,7 @@ void AtomRendererClient::WillDestroyWorkerContextOnWorkerThread(
 }
 
 v8::Local<v8::Context> AtomRendererClient::GetContext(
-    blink::WebFrame* frame, v8::Isolate* isolate) {
+    blink::WebLocalFrame* frame, v8::Isolate* isolate) {
   if (isolated_world())
     return frame->WorldScriptContext(isolate, World::ISOLATED_WORLD);
   else
