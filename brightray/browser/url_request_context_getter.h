@@ -70,7 +70,6 @@ class URLRequestContextGetter : public net::URLRequestContextGetter {
       const base::FilePath& base_path,
       bool in_memory,
       scoped_refptr<base::SingleThreadTaskRunner> io_task_runner,
-      scoped_refptr<base::SingleThreadTaskRunner> file_task_runner,
       content::ProtocolHandlerMap* protocol_handlers,
       content::URLRequestInterceptorScopedVector protocol_interceptors);
   virtual ~URLRequestContextGetter();
@@ -94,7 +93,6 @@ class URLRequestContextGetter : public net::URLRequestContextGetter {
   base::FilePath base_path_;
   bool in_memory_;
   scoped_refptr<base::SingleThreadTaskRunner> io_task_runner_;
-  scoped_refptr<base::SingleThreadTaskRunner> file_task_runner_;
 
   std::string user_agent_;
 
