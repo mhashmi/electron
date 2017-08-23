@@ -12,6 +12,7 @@
 
 #include "brightray/browser/browser_client.h"
 #include "content/public/browser/render_process_host_observer.h"
+#include "net/ssl/client_cert_identity.h"
 
 namespace content {
 class QuotaPermissionContext;

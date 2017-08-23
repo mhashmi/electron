@@ -25,6 +25,7 @@
 #include "native_mate/dictionary.h"
 #include "native_mate/handle.h"
 #include "net/base/completion_callback.h"
+#include "net/ssl/client_cert_identity.h"
 
 #if defined(USE_NSS_CERTS)
 #include "chrome/browser/certificate_manager_model.h"
