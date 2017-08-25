@@ -350,6 +350,8 @@ bool AtomBrowserClient::CanCreateWindow(
     bool* no_javascript_access) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::IO);
 
+  int opener_render_process_id = opener->GetProcess()->GetID();
+
   if (IsRendererSandboxed(opener_render_process_id)) {
     *no_javascript_access = false;
     return true;
@@ -375,8 +377,7 @@ bool AtomBrowserClient::CanCreateWindow(
                                     disposition,
                                     additional_features,
                                     body,
-                                    opener_render_process_id,
-                                    opener_render_frame_id));
+                                    opener));
   }
 
   return false;
