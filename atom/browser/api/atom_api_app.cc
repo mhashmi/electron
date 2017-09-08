@@ -444,7 +444,8 @@ void OnClientCertificateSelected(
       data.c_str(), data.length(), net::X509Certificate::FORMAT_AUTO);
   if (!certs.empty()) {
     scoped_refptr<net::X509Certificate> cert(certs[0].get());
-    delegate->ContinueWithCertificate(cert, nullptr);  // FIXME: Pass private key.
+    // FIXME: Pass private key as a second argument.
+    delegate->ContinueWithCertificate(cert, nullptr);
   }
 }
 
@@ -683,7 +684,8 @@ void App::SelectClientCertificate(
   // Default to first certificate from the platform store.
   if (!prevent_default) {
     scoped_refptr<net::X509Certificate> cert = identities[0]->certificate();
-    shared_delegate->ContinueWithCertificate(cert, nullptr);  // FIXME: Pass private key.
+    // FIXME: Pass private key as a second argument.
+    shared_delegate->ContinueWithCertificate(cert, nullptr);
   }
 }
 
