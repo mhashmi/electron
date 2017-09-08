@@ -81,7 +81,8 @@ void PlatformNotificationService::DisplayNotification(
   auto presenter = browser_client_->GetNotificationPresenter();
   if (!presenter)
     return;
-  brightray::NotificationDelegate* delegate = new NotificationDelegate(notification_id);
+  brightray::NotificationDelegate* delegate =
+      new NotificationDelegate(notification_id);
   auto notification = presenter->CreateNotification(delegate);
   if (notification) {
     *cancel_callback = base::Bind(&RemoveNotification, notification);
