@@ -35,7 +35,7 @@ environment:
   ELECTRON_ENABLE_STACK_DUMPING: 1
   MOCHA_REPORTER: mocha-multi-reporters
   MOCHA_MULTI_REPORTERS: mocha-appveyor-reporter, tap
-  nodejs_version: "10.12.0"
+  nodejs_version: "10.13.0"
 notifications:
   - provider: Webhook
     url: https://electron-mission-control.herokuapp.com/rest/appveyor-hook
@@ -48,7 +48,6 @@ notifications:
     on_build_status_changed: false
 install:
   - ps: Update-NodeJsInstallation (Get-NodeJsLatestBuild $env:nodejs_version) x64
-  - npm install
 
 build_script:
   - ps: >-
