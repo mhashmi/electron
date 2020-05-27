@@ -48,6 +48,9 @@ notifications:
     on_build_status_changed: false
 install:
   - ps: Update-NodeJsInstallation (Get-NodeJsLatestBuild $env:nodejs_version) x64
+  - cmd: >-
+    cd c:\projects\electron\.. && git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git 
+    set PATH=%PATH%;c:\projects\depot_tools
 
 build_script:
   - ps: >-
