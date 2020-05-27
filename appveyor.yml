@@ -28,7 +28,6 @@
 #  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
 
 version: 1.0.{build}
-build_cloud: Hyper-V "4-cores"
 image: Visual Studio 2019
 environment:
   GIT_CACHE_PATH: C:\Users\electron\libcc_cache
