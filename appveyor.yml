@@ -46,6 +46,10 @@ notifications:
     on_build_success: false
     on_build_failure: true
     on_build_status_changed: false
+install:
+  - ps: Update-NodeJsInstallation (Get-NodeJsLatestBuild $env:nodejs_version) x64
+  - npm install
+
 build_script:
   - ps: >-
       if(($env:APPVEYOR_PULL_REQUEST_HEAD_REPO_NAME -split "/")[0] -eq ($env:APPVEYOR_REPO_NAME -split "/")[0]) {
