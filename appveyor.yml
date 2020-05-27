@@ -54,6 +54,8 @@ install:
       git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
       
       set PATH=%PATH%;c:\projects\depot_tools
+      
+      cd c:\projects\electron
 
 build_script:
   - ps: >-
