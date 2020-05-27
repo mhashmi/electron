@@ -1,80 +1,77 @@
-const {app, BrowserWindow, ipcMain} = require('electron')
-const net = require('net')
-const path = require('path')
+const { app, BrowserWindow, ipcMain } = require('electron');
+const net = require('net');
+const path = require('path');
 
 process.on('uncaughtException', () => {
-  app.exit(1)
-})
+  app.exit(1);
+});
 
-if (!process.argv.includes('--enable-mixed-sandbox')) {
-  app.enableMixedSandbox()
+if (process.argv.includes('--app-enable-sandbox')) {
+  app.enableSandbox();
 }
 
-let sandboxWindow
-let noSandboxWindow
+let currentWindowSandboxed = false;
 
-app.once('ready', () => {
-  sandboxWindow = new BrowserWindow({
-    show: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'electron-app-mixed-sandbox-preload.js'),
-      sandbox: true
-    }
-  })
-  sandboxWindow.loadURL('about:blank')
-
-  noSandboxWindow = new BrowserWindow({
-    show: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'electron-app-mixed-sandbox-preload.js'),
-      sandbox: false
-    }
-  })
-  noSandboxWindow.loadURL('about:blank')
+app.whenReady().then(() => {
+  function testWindow (isSandboxed, callback) {
+    currentWindowSandboxed = isSandboxed;
+    const currentWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        preload: path.join(__dirname, 'electron-app-mixed-sandbox-preload.js'),
+        sandbox: isSandboxed
+      }
+    });
+    currentWindow.loadURL('about:blank');
+    currentWindow.webContents.once('devtools-opened', () => {
+      if (isSandboxed) {
+        argv.sandboxDevtools = true;
+      } else {
+        argv.noSandboxDevtools = true;
+      }
+      if (callback) {
+        callback();
+      }
+      finish();
+    });
+    currentWindow.webContents.openDevTools();
+  }
 
   const argv = {
     sandbox: null,
     noSandbox: null,
     sandboxDevtools: null,
     noSandboxDevtools: null
-  }
+  };
 
-  let connected = false
+  let connected = false;
+
+  testWindow(true, () => {
+    testWindow();
+  });
 
   function finish () {
     if (connected && argv.sandbox != null && argv.noSandbox != null &&
         argv.noSandboxDevtools != null && argv.sandboxDevtools != null) {
       client.once('end', () => {
-        app.exit(0)
-      })
-      client.end(JSON.stringify(argv))
+        app.exit(0);
+      });
+      client.end(JSON.stringify(argv));
     }
   }
 
-  const socketPath = process.platform === 'win32' ? '\\\\.\\pipe\\electron-mixed-sandbox' : '/tmp/electron-mixed-sandbox'
+  const socketPath = process.platform === 'win32' ? '\\\\.\\pipe\\electron-mixed-sandbox' : '/tmp/electron-mixed-sandbox';
   const client = net.connect(socketPath, () => {
-    connected = true
-    finish()
-  })
-
-  noSandboxWindow.webContents.once('devtools-opened', () => {
-    argv.noSandboxDevtools = true
-    finish()
-  })
-  noSandboxWindow.webContents.openDevTools()
-
-  sandboxWindow.webContents.once('devtools-opened', () => {
-    argv.sandboxDevtools = true
-    finish()
-  })
-  sandboxWindow.webContents.openDevTools()
+    connected = true;
+    finish();
+  });
 
   ipcMain.on('argv', (event, value) => {
-    if (event.sender === sandboxWindow.webContents) {
-      argv.sandbox = value
-    } else if (event.sender === noSandboxWindow.webContents) {
-      argv.noSandbox = value
+    if (currentWindowSandboxed) {
+      argv.sandbox = value;
+    } else {
+      argv.noSandbox = value;
     }
-    finish()
-  })
-})
+    finish();
+  });
+});

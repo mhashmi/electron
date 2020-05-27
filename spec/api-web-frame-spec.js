@@ -1,140 +1,140 @@
-const assert = require('assert')
-const path = require('path')
-const {closeWindow} = require('./window-helpers')
-const {remote, webFrame} = require('electron')
-const {BrowserWindow, protocol, ipcMain} = remote
+const { expect } = require('chai');
+const { webFrame } = require('electron');
 
 describe('webFrame module', function () {
-  var fixtures = path.resolve(__dirname, 'fixtures')
-  var w = null
+  it('top is self for top frame', () => {
+    expect(webFrame.top.context).to.equal(webFrame.context);
+  });
 
-  afterEach(function () {
-    return closeWindow(w).then(function () { w = null })
-  })
+  it('opener is null for top frame', () => {
+    expect(webFrame.opener).to.be.null();
+  });
 
-  describe('webFrame.registerURLSchemeAsPrivileged', function () {
-    it('supports fetch api by default', function (done) {
-      webFrame.registerURLSchemeAsPrivileged('file')
-      var url = 'file://' + fixtures + '/assets/logo.png'
-      window.fetch(url).then(function (response) {
-        assert(response.ok)
-        done()
-      }).catch(function (err) {
-        done('unexpected error : ' + err)
-      })
-    })
+  it('firstChild is null for top frame', () => {
+    expect(webFrame.firstChild).to.be.null();
+  });
 
-    it('allows CORS requests by default', function (done) {
-      allowsCORSRequests(200, `<html>
-        <script>
-        const {ipcRenderer, webFrame} = require('electron')
-        webFrame.registerURLSchemeAsPrivileged('cors1')
-        fetch('cors1://myhost').then(function (response) {
-          ipcRenderer.send('response', response.status)
-        }).catch(function (response) {
-          ipcRenderer.send('response', 'failed')
+  it('getFrameForSelector() does not crash when not found', () => {
+    expect(webFrame.getFrameForSelector('unexist-selector')).to.be.null();
+  });
+
+  it('findFrameByName() does not crash when not found', () => {
+    expect(webFrame.findFrameByName('unexist-name')).to.be.null();
+  });
+
+  it('findFrameByRoutingId() does not crash when not found', () => {
+    expect(webFrame.findFrameByRoutingId(-1)).to.be.null();
+  });
+
+  describe('executeJavaScript', () => {
+    let childFrameElement, childFrame;
+
+    before(() => {
+      childFrameElement = document.createElement('iframe');
+      document.body.appendChild(childFrameElement);
+      childFrame = webFrame.firstChild;
+    });
+
+    after(() => {
+      childFrameElement.remove();
+    });
+
+    it('executeJavaScript() yields results via a promise and a sync callback', done => {
+      let callbackResult, callbackError;
+
+      childFrame
+        .executeJavaScript('1 + 1', (result, error) => {
+          callbackResult = result;
+          callbackError = error;
         })
-        </script>
-      </html>`, done)
-    })
+        .then(
+          promiseResult => {
+            expect(promiseResult).to.equal(2);
+            done();
+          },
+          promiseError => {
+            done(promiseError);
+          }
+        );
 
-    it('allows CORS and fetch requests when specified', function (done) {
-      allowsCORSRequests(200, `<html>
-        <script>
-        const {ipcRenderer, webFrame} = require('electron')
-        webFrame.registerURLSchemeAsPrivileged('cors2', { supportFetchAPI: true, corsEnabled: true })
-        fetch('cors2://myhost').then(function (response) {
-          ipcRenderer.send('response', response.status)
-        }).catch(function (response) {
-          ipcRenderer.send('response', 'failed')
+      expect(callbackResult).to.equal(2);
+      expect(callbackError).to.be.undefined();
+    });
+
+    it('executeJavaScriptInIsolatedWorld() yields results via a promise and a sync callback', done => {
+      let callbackResult, callbackError;
+
+      childFrame
+        .executeJavaScriptInIsolatedWorld(999, [{ code: '1 + 1' }], (result, error) => {
+          callbackResult = result;
+          callbackError = error;
         })
-        </script>
-      </html>`, done)
-    })
+        .then(
+          promiseResult => {
+            expect(promiseResult).to.equal(2);
+            done();
+          },
+          promiseError => {
+            done(promiseError);
+          }
+        );
 
-    it('allows CORS and fetch requests when half-specified', function (done) {
-      allowsCORSRequests(200, `<html>
-        <script>
-        const {ipcRenderer, webFrame} = require('electron')
-        webFrame.registerURLSchemeAsPrivileged('cors3', { supportFetchAPI: true })
-        fetch('cors3://myhost').then(function (response) {
-          ipcRenderer.send('response', response.status)
-        }).catch(function (response) {
-          ipcRenderer.send('response', 'failed')
+      expect(callbackResult).to.equal(2);
+      expect(callbackError).to.be.undefined();
+    });
+
+    it('executeJavaScript() yields errors via a promise and a sync callback', done => {
+      let callbackResult, callbackError;
+
+      childFrame
+        .executeJavaScript('thisShouldProduceAnError()', (result, error) => {
+          callbackResult = result;
+          callbackError = error;
         })
-        </script>
-      </html>`, done)
-    })
+        .then(
+          promiseResult => {
+            done(new Error('error is expected'));
+          },
+          promiseError => {
+            expect(promiseError).to.be.an('error');
+            done();
+          }
+        );
 
-    it('disallows CORS, but allows fetch requests, when specified', function (done) {
-      allowsCORSRequests('failed', `<html>
-        <script>
-        const {ipcRenderer, webFrame} = require('electron')
-        webFrame.registerURLSchemeAsPrivileged('cors4', { supportFetchAPI: true, corsEnabled: false })
-        fetch('cors4://myhost').then(function (response) {
-          ipcRenderer.send('response', response.status)
-        }).catch(function (response) {
-          ipcRenderer.send('response', 'failed')
-        })
-        </script>
-      </html>`, done)
-    })
+      expect(callbackResult).to.be.undefined();
+      expect(callbackError).to.be.an('error');
+    });
 
-    it('allows CORS, but disallows fetch requests, when specified', function (done) {
-      allowsCORSRequests('failed', `<html>
-        <script>
-        const {ipcRenderer, webFrame} = require('electron')
-        webFrame.registerURLSchemeAsPrivileged('cors5', { supportFetchAPI: false, corsEnabled: true })
-        fetch('cors5://myhost').then(function (response) {
-          ipcRenderer.send('response', response.status)
-        }).catch(function (response) {
-          ipcRenderer.send('response', 'failed')
-        })
-        </script>
-      </html>`, done)
-    })
+    // executeJavaScriptInIsolatedWorld is failing to detect exec errors and is neither
+    // rejecting nor passing the error to the callback. This predates the reintroduction
+    // of the callback so will not be fixed as part of the callback PR
+    // if/when this is fixed the test can be uncommented.
+    //
+    // it('executeJavaScriptInIsolatedWorld() yields errors via a promise and a sync callback', done => {
+    //   let callbackResult, callbackError
+    //
+    //   childFrame
+    //     .executeJavaScriptInIsolatedWorld(999, [{ code: 'thisShouldProduceAnError()' }], (result, error) => {
+    //       callbackResult = result
+    //       callbackError = error
+    //     })
+    //     .then(
+    //       promiseResult => {
+    //         done(new Error('error is expected'))
+    //       },
+    //       promiseError => {
+    //         expect(promiseError).to.be.an('error')
+    //         done()
+    //       }
+    //     )
+    //
+    //   expect(callbackResult).to.be.undefined()
+    //   expect(callbackError).to.be.an('error')
+    // })
 
-    var runNumber = 1
-    function allowsCORSRequests (expected, content, done) {
-      const standardScheme = remote.getGlobal('standardScheme') + runNumber
-      const corsScheme = 'cors' + runNumber
-      runNumber++
-
-      const url = standardScheme + '://fake-host'
-      w = new BrowserWindow({show: false})
-      after(function (done) {
-        protocol.unregisterProtocol(corsScheme, function () {
-          protocol.unregisterProtocol(standardScheme, function () {
-            done()
-          })
-        })
-      })
-
-      const handler = function (request, callback) {
-        callback({data: content, mimeType: 'text/html'})
-      }
-      protocol.registerStringProtocol(standardScheme, handler, function (error) {
-        if (error) return done(error)
-      })
-
-      protocol.registerStringProtocol(corsScheme, function (request, callback) {
-        callback('')
-      }, function (error) {
-        if (error) return done(error)
-        ipcMain.once('response', function (event, status) {
-          assert.equal(status, expected)
-          done()
-        })
-        w.loadURL(url)
-      })
-    }
-  })
-
-  it('supports setting the visual and layout zoom level limits', function () {
-    assert.doesNotThrow(function () {
-      webFrame.setZoomLevelLimits(1, 100)
-      webFrame.setVisualZoomLevelLimits(1, 50)
-      webFrame.setLayoutZoomLevelLimits(0, 25)
-    })
-  })
-})
+    it('executeJavaScript(InIsolatedWorld) can be used without a callback', async () => {
+      expect(await webFrame.executeJavaScript('1 + 1')).to.equal(2);
+      expect(await webFrame.executeJavaScriptInIsolatedWorld(999, [{ code: '1 + 1' }])).to.equal(2);
+    });
+  });
+});

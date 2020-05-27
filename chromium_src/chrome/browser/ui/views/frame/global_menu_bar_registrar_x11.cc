@@ -4,11 +4,11 @@
 
 #include "chrome/browser/ui/views/frame/global_menu_bar_registrar_x11.h"
 
-#include "atom/browser/ui/views/global_menu_bar_x11.h"
 #include "base/bind.h"
 #include "base/debug/leak_annotations.h"
 #include "base/logging.h"
 #include "content/public/browser/browser_thread.h"
+#include "shell/browser/ui/views/global_menu_bar_x11.h"
 
 using content::BrowserThread;
 
@@ -45,24 +45,19 @@ GlobalMenuBarRegistrarX11::GlobalMenuBarRegistrarX11()
   // even when |connection_type| is set to SHARED.
   g_dbus_proxy_new_for_bus(
       G_BUS_TYPE_SESSION,
-      static_cast<GDBusProxyFlags>(
-          G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES |
-          G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS |
-          G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START),
-      nullptr,
-      kAppMenuRegistrarName,
-      kAppMenuRegistrarPath,
+      static_cast<GDBusProxyFlags>(G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES |
+                                   G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS |
+                                   G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START),
+      nullptr, kAppMenuRegistrarName, kAppMenuRegistrarPath,
       kAppMenuRegistrarName,
       nullptr,  // TODO: Probalby want a real cancelable.
-      static_cast<GAsyncReadyCallback>(OnProxyCreatedThunk),
-      this);
+      static_cast<GAsyncReadyCallback>(OnProxyCreatedThunk), this);
 }
 
 GlobalMenuBarRegistrarX11::~GlobalMenuBarRegistrarX11() {
   if (registrar_proxy_) {
     g_signal_handlers_disconnect_by_func(
-        registrar_proxy_,
-        reinterpret_cast<void*>(OnNameOwnerChangedThunk),
+        registrar_proxy_, reinterpret_cast<void*>(OnNameOwnerChangedThunk),
         this);
     g_object_unref(registrar_proxy_);
   }
@@ -70,9 +65,9 @@ GlobalMenuBarRegistrarX11::~GlobalMenuBarRegistrarX11() {
 
 void GlobalMenuBarRegistrarX11::RegisterXID(unsigned long xid) {
   DCHECK(registrar_proxy_);
-  std::string path = atom::GlobalMenuBarX11::GetPathForWindow(xid);
+  std::string path = electron::GlobalMenuBarX11::GetPathForWindow(xid);
 
-  ANNOTATE_SCOPED_MEMORY_LEAK; // http://crbug.com/314087
+  ANNOTATE_SCOPED_MEMORY_LEAK;  // http://crbug.com/314087
   // TODO(erg): The mozilla implementation goes to a lot of callback trouble
   // just to make sure that they react to make sure there's some sort of
   // cancelable object; including making a whole callback just to handle the
@@ -80,20 +75,16 @@ void GlobalMenuBarRegistrarX11::RegisterXID(unsigned long xid) {
   //
   // I don't see any reason why we should care if "RegisterWindow" completes or
   // not.
-  g_dbus_proxy_call(registrar_proxy_,
-                    "RegisterWindow",
+  g_dbus_proxy_call(registrar_proxy_, "RegisterWindow",
                     g_variant_new("(uo)", xid, path.c_str()),
-                    G_DBUS_CALL_FLAGS_NONE, -1,
-                    nullptr,
-                    nullptr,
-                    nullptr);
+                    G_DBUS_CALL_FLAGS_NONE, -1, nullptr, nullptr, nullptr);
 }
 
 void GlobalMenuBarRegistrarX11::UnregisterXID(unsigned long xid) {
   DCHECK(registrar_proxy_);
-  std::string path = atom::GlobalMenuBarX11::GetPathForWindow(xid);
+  std::string path = electron::GlobalMenuBarX11::GetPathForWindow(xid);
 
-  ANNOTATE_SCOPED_MEMORY_LEAK; // http://crbug.com/314087
+  ANNOTATE_SCOPED_MEMORY_LEAK;  // http://crbug.com/314087
   // TODO(erg): The mozilla implementation goes to a lot of callback trouble
   // just to make sure that they react to make sure there's some sort of
   // cancelable object; including making a whole callback just to handle the
@@ -101,13 +92,9 @@ void GlobalMenuBarRegistrarX11::UnregisterXID(unsigned long xid) {
   //
   // I don't see any reason why we should care if "UnregisterWindow" completes
   // or not.
-  g_dbus_proxy_call(registrar_proxy_,
-                    "UnregisterWindow",
-                    g_variant_new("(u)", xid),
-                    G_DBUS_CALL_FLAGS_NONE, -1,
-                    nullptr,
-                    nullptr,
-                    nullptr);
+  g_dbus_proxy_call(registrar_proxy_, "UnregisterWindow",
+                    g_variant_new("(u)", xid), G_DBUS_CALL_FLAGS_NONE, -1,
+                    nullptr, nullptr, nullptr);
 }
 
 void GlobalMenuBarRegistrarX11::OnProxyCreated(GObject* source,

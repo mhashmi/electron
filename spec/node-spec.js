@@ -1,353 +1,423 @@
-const assert = require('assert')
-const ChildProcess = require('child_process')
-const fs = require('fs')
-const path = require('path')
-const os = require('os')
-const {ipcRenderer, remote} = require('electron')
+const ChildProcess = require('child_process');
+const { expect } = require('chai');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { ipcRenderer } = require('electron');
+const features = process.electronBinding('features');
 
-const isCI = remote.getGlobal('isCi')
+const { emittedOnce } = require('./events-helpers');
+const { ifit } = require('./spec-helpers');
 
-describe('node feature', function () {
-  var fixtures = path.join(__dirname, 'fixtures')
+describe('node feature', () => {
+  const fixtures = path.join(__dirname, 'fixtures');
 
-  describe('child_process', function () {
-    describe('child_process.fork', function () {
-      it('works in current process', function (done) {
-        var child = ChildProcess.fork(path.join(fixtures, 'module', 'ping.js'))
-        child.on('message', function (msg) {
-          assert.equal(msg, 'message')
-          done()
-        })
-        child.send('message')
-      })
+  describe('child_process', () => {
+    beforeEach(function () {
+      if (!features.isRunAsNodeEnabled()) {
+        this.skip();
+      }
+    });
 
-      it('preserves args', function (done) {
-        var args = ['--expose_gc', '-test', '1']
-        var child = ChildProcess.fork(path.join(fixtures, 'module', 'process_args.js'), args)
-        child.on('message', function (msg) {
-          assert.deepEqual(args, msg.slice(2))
-          done()
-        })
-        child.send('message')
-      })
+    describe('child_process.fork', () => {
+      it('works in current process', (done) => {
+        const child = ChildProcess.fork(path.join(fixtures, 'module', 'ping.js'));
+        child.on('message', msg => {
+          expect(msg).to.equal('message');
+          done();
+        });
+        child.send('message');
+      });
 
-      it('works in forked process', function (done) {
-        var child = ChildProcess.fork(path.join(fixtures, 'module', 'fork_ping.js'))
-        child.on('message', function (msg) {
-          assert.equal(msg, 'message')
-          done()
-        })
-        child.send('message')
-      })
+      it('preserves args', (done) => {
+        const args = ['--expose_gc', '-test', '1'];
+        const child = ChildProcess.fork(path.join(fixtures, 'module', 'process_args.js'), args);
+        child.on('message', (msg) => {
+          expect(args).to.deep.equal(msg.slice(2));
+          done();
+        });
+        child.send('message');
+      });
 
-      it('works in forked process when options.env is specifed', function (done) {
-        var child = ChildProcess.fork(path.join(fixtures, 'module', 'fork_ping.js'), [], {
-          path: process.env['PATH']
-        })
-        child.on('message', function (msg) {
-          assert.equal(msg, 'message')
-          done()
-        })
-        child.send('message')
-      })
+      it('works in forked process', (done) => {
+        const child = ChildProcess.fork(path.join(fixtures, 'module', 'fork_ping.js'));
+        child.on('message', (msg) => {
+          expect(msg).to.equal('message');
+          done();
+        });
+        child.send('message');
+      });
 
-      it('works in browser process', function (done) {
-        var fork = remote.require('child_process').fork
-        var child = fork(path.join(fixtures, 'module', 'ping.js'))
-        child.on('message', function (msg) {
-          assert.equal(msg, 'message')
-          done()
-        })
-        child.send('message')
-      })
+      it('works in forked process when options.env is specifed', (done) => {
+        const child = ChildProcess.fork(path.join(fixtures, 'module', 'fork_ping.js'), [], {
+          path: process.env.PATH
+        });
+        child.on('message', (msg) => {
+          expect(msg).to.equal('message');
+          done();
+        });
+        child.send('message');
+      });
 
-      it('has String::localeCompare working in script', function (done) {
-        var child = ChildProcess.fork(path.join(fixtures, 'module', 'locale-compare.js'))
-        child.on('message', function (msg) {
-          assert.deepEqual(msg, [0, -1, 1])
-          done()
-        })
-        child.send('message')
-      })
+      it('has String::localeCompare working in script', (done) => {
+        const child = ChildProcess.fork(path.join(fixtures, 'module', 'locale-compare.js'));
+        child.on('message', (msg) => {
+          expect(msg).to.deep.equal([0, -1, 1]);
+          done();
+        });
+        child.send('message');
+      });
 
-      it('has setImmediate working in script', function (done) {
-        var child = ChildProcess.fork(path.join(fixtures, 'module', 'set-immediate.js'))
-        child.on('message', function (msg) {
-          assert.equal(msg, 'ok')
-          done()
-        })
-        child.send('message')
-      })
+      it('has setImmediate working in script', (done) => {
+        const child = ChildProcess.fork(path.join(fixtures, 'module', 'set-immediate.js'));
+        child.on('message', (msg) => {
+          expect(msg).to.equal('ok');
+          done();
+        });
+        child.send('message');
+      });
 
-      it('pipes stdio', function (done) {
-        let child = ChildProcess.fork(path.join(fixtures, 'module', 'process-stdout.js'), {silent: true})
-        let data = ''
+      it('pipes stdio', (done) => {
+        const child = ChildProcess.fork(path.join(fixtures, 'module', 'process-stdout.js'), { silent: true });
+        let data = '';
         child.stdout.on('data', (chunk) => {
-          data += String(chunk)
-        })
+          data += String(chunk);
+        });
         child.on('close', (code) => {
-          assert.equal(code, 0)
-          assert.equal(data, 'pipes stdio')
-          done()
-        })
-      })
+          expect(code).to.equal(0);
+          expect(data).to.equal('pipes stdio');
+          done();
+        });
+      });
 
-      it('works when sending a message to a process forked with the --eval argument', function (done) {
-        const source = "process.on('message', (message) => { process.send(message) })"
-        const forked = ChildProcess.fork('--eval', [source])
+      it('works when sending a message to a process forked with the --eval argument', (done) => {
+        const source = "process.on('message', (message) => { process.send(message) })";
+        const forked = ChildProcess.fork('--eval', [source]);
         forked.once('message', (message) => {
-          assert.equal(message, 'hello')
-          done()
-        })
-        forked.send('hello')
-      })
-    })
+          expect(message).to.equal('hello');
+          done();
+        });
+        forked.send('hello');
+      });
 
-    describe('child_process.spawn', function () {
-      let child
+      it('has the electron version in process.versions', (done) => {
+        const source = 'process.send(process.versions)';
+        const forked = ChildProcess.fork('--eval', [source]);
+        forked.on('message', (message) => {
+          expect(message)
+            .to.have.own.property('electron')
+            .that.is.a('string')
+            .and.matches(/^\d+\.\d+\.\d+(\S*)?$/);
+          done();
+        });
+      });
+    });
 
-      afterEach(function () {
-        if (child != null) {
-          child.kill()
-        }
-      })
+    describe('child_process.spawn', () => {
+      let child;
 
-      it('supports spawning Electron as a node process via the ELECTRON_RUN_AS_NODE env var', function (done) {
+      afterEach(() => {
+        if (child != null) child.kill();
+      });
+
+      it('supports spawning Electron as a node process via the ELECTRON_RUN_AS_NODE env var', (done) => {
         child = ChildProcess.spawn(process.execPath, [path.join(__dirname, 'fixtures', 'module', 'run-as-node.js')], {
           env: {
             ELECTRON_RUN_AS_NODE: true
           }
-        })
+        });
 
-        let output = ''
-        child.stdout.on('data', function (data) {
-          output += data
-        })
-        child.stdout.on('close', function () {
-          assert.deepEqual(JSON.parse(output), {
+        let output = '';
+        child.stdout.on('data', data => {
+          output += data;
+        });
+        child.stdout.on('close', () => {
+          expect(JSON.parse(output)).to.deep.equal({
             processLog: process.platform === 'win32' ? 'function' : 'undefined',
             processType: 'undefined',
             window: 'undefined'
-          })
-          done()
-        })
-      })
+          });
+          done();
+        });
+      });
+    });
 
-      it('supports starting the v8 inspector with --inspect/--inspect-brk', function (done) {
-        child = ChildProcess.spawn(process.execPath, ['--inspect-brk', path.join(__dirname, 'fixtures', 'module', 'run-as-node.js')], {
-          env: {
-            ELECTRON_RUN_AS_NODE: true
-          }
-        })
+    describe('child_process.exec', () => {
+      (process.platform === 'linux' ? it : it.skip)('allows executing a setuid binary from non-sandboxed renderer', () => {
+        // Chrome uses prctl(2) to set the NO_NEW_PRIVILEGES flag on Linux (see
+        // https://github.com/torvalds/linux/blob/40fde647cc/Documentation/userspace-api/no_new_privs.rst).
+        // We disable this for unsandboxed processes, which the renderer tests
+        // are running in. If this test fails with an error like 'effective uid
+        // is not 0', then it's likely that our patch to prevent the flag from
+        // being set has become ineffective.
+        const stdout = ChildProcess.execSync('sudo --help');
+        expect(stdout).to.not.be.empty();
+      });
+    });
+  });
 
-        let output = ''
-        child.stderr.on('data', function (data) {
-          output += data
-
-          if (output.trim().startsWith('Debugger listening on ws://')) {
-            done()
-          }
-        })
-
-        child.stdout.on('data', function (data) {
-          done(new Error(`Unexpected output: ${data.toString()}`))
-        })
-      })
-    })
-  })
-
-  describe('contexts', function () {
-    describe('setTimeout in fs callback', function () {
-      if (process.env.TRAVIS === 'true') {
-        return
-      }
-
-      it('does not crash', function (done) {
-        fs.readFile(__filename, function () {
-          setTimeout(done, 0)
-        })
-      })
-    })
-
-    describe('error thrown in renderer process node context', function () {
-      it('gets emitted as a process uncaughtException event', function (done) {
-        const error = new Error('boo!')
-        const listeners = process.listeners('uncaughtException')
-        process.removeAllListeners('uncaughtException')
-        process.on('uncaughtException', (thrown) => {
-          assert.strictEqual(thrown, error)
-          process.removeAllListeners('uncaughtException')
-          listeners.forEach((listener) => {
-            process.on('uncaughtException', listener)
-          })
-          done()
-        })
+  describe('contexts', () => {
+    describe('setTimeout in fs callback', () => {
+      it('does not crash', (done) => {
         fs.readFile(__filename, () => {
-          throw error
-        })
-      })
-    })
+          setTimeout(done, 0);
+        });
+      });
+    });
 
-    describe('error thrown in main process node context', function () {
-      it('gets emitted as a process uncaughtException event', function () {
-        const error = ipcRenderer.sendSync('handle-uncaught-exception', 'hello')
-        assert.equal(error, 'hello')
-      })
-    })
+    describe('error thrown in renderer process node context', () => {
+      it('gets emitted as a process uncaughtException event', (done) => {
+        const error = new Error('boo!');
+        const listeners = process.listeners('uncaughtException');
+        process.removeAllListeners('uncaughtException');
+        process.on('uncaughtException', (thrown) => {
+          try {
+            expect(thrown).to.equal(error);
+            done();
+          } catch (e) {
+            done(e);
+          } finally {
+            process.removeAllListeners('uncaughtException');
+            listeners.forEach((listener) => process.on('uncaughtException', listener));
+          }
+        });
+        fs.readFile(__filename, () => {
+          throw error;
+        });
+      });
+    });
 
-    describe('promise rejection in main process node context', function () {
-      it('gets emitted as a process unhandledRejection event', function () {
-        const error = ipcRenderer.sendSync('handle-unhandled-rejection', 'hello')
-        assert.equal(error, 'hello')
-      })
-    })
+    describe('error thrown in main process node context', () => {
+      it('gets emitted as a process uncaughtException event', () => {
+        const error = ipcRenderer.sendSync('handle-uncaught-exception', 'hello');
+        expect(error).to.equal('hello');
+      });
+    });
 
-    describe('setTimeout called under Chromium event loop in browser process', function () {
-      it('can be scheduled in time', function (done) {
-        remote.getGlobal('setTimeout')(done, 0)
-      })
-    })
+    describe('promise rejection in main process node context', () => {
+      it('gets emitted as a process unhandledRejection event', () => {
+        const error = ipcRenderer.sendSync('handle-unhandled-rejection', 'hello');
+        expect(error).to.equal('hello');
+      });
+    });
 
-    describe('setInterval called under Chromium event loop in browser process', function () {
-      it('can be scheduled in time', function (done) {
-        var clear, interval
-        clear = function () {
-          remote.getGlobal('clearInterval')(interval)
-          done()
-        }
-        interval = remote.getGlobal('setInterval')(clear, 10)
-      })
-    })
-  })
+    describe('setTimeout called under blink env in renderer process', () => {
+      it('can be scheduled in time', (done) => {
+        setTimeout(done, 10);
+      });
 
-  describe('message loop', function () {
-    describe('process.nextTick', function () {
-      it('emits the callback', function (done) {
-        process.nextTick(done)
-      })
+      it('works from the timers module', (done) => {
+        require('timers').setTimeout(done, 10);
+      });
+    });
 
-      it('works in nested calls', function (done) {
-        process.nextTick(function () {
-          process.nextTick(function () {
-            process.nextTick(done)
-          })
-        })
-      })
-    })
+    describe('setInterval called under blink env in renderer process', () => {
+      it('can be scheduled in time', (done) => {
+        const id = setInterval(() => {
+          clearInterval(id);
+          done();
+        }, 10);
+      });
 
-    describe('setImmediate', function () {
-      it('emits the callback', function (done) {
-        setImmediate(done)
-      })
+      it('can be scheduled in time from timers module', (done) => {
+        const { setInterval, clearInterval } = require('timers');
+        const id = setInterval(() => {
+          clearInterval(id);
+          done();
+        }, 10);
+      });
+    });
+  });
 
-      it('works in nested calls', function (done) {
-        setImmediate(function () {
-          setImmediate(function () {
-            setImmediate(done)
-          })
-        })
-      })
-    })
-  })
+  describe('message loop', () => {
+    describe('process.nextTick', () => {
+      it('emits the callback', (done) => process.nextTick(done));
 
-  describe('net.connect', function () {
-    if (process.platform !== 'darwin') {
-      return
-    }
+      it('works in nested calls', (done) => {
+        process.nextTick(() => {
+          process.nextTick(() => process.nextTick(done));
+        });
+      });
+    });
 
-    it('emit error when connect to a socket path without listeners', function (done) {
-      var socketPath = path.join(os.tmpdir(), 'atom-shell-test.sock')
-      var script = path.join(fixtures, 'module', 'create_socket.js')
-      var child = ChildProcess.fork(script, [socketPath])
-      child.on('exit', function (code) {
-        assert.equal(code, 0)
-        var client = require('net').connect(socketPath)
-        client.on('error', function (error) {
-          assert.equal(error.code, 'ECONNREFUSED')
-          done()
-        })
-      })
-    })
-  })
+    describe('setImmediate', () => {
+      it('emits the callback', (done) => setImmediate(done));
 
-  describe('Buffer', function () {
-    it('can be created from WebKit external string', function () {
-      var p = document.createElement('p')
-      p.innerText = '闲云潭影日悠悠，物换星移几度秋'
-      var b = new Buffer(p.innerText)
-      assert.equal(b.toString(), '闲云潭影日悠悠，物换星移几度秋')
-      assert.equal(Buffer.byteLength(p.innerText), 45)
-    })
+      it('works in nested calls', (done) => {
+        setImmediate(() => {
+          setImmediate(() => setImmediate(done));
+        });
+      });
+    });
+  });
 
-    it('correctly parses external one-byte UTF8 string', function () {
-      var p = document.createElement('p')
-      p.innerText = 'Jøhänñéß'
-      var b = new Buffer(p.innerText)
-      assert.equal(b.toString(), 'Jøhänñéß')
-      assert.equal(Buffer.byteLength(p.innerText), 13)
-    })
-
-    it('does not crash when creating large Buffers', function () {
-      var buffer = new Buffer(new Array(4096).join(' '))
-      assert.equal(buffer.length, 4095)
-      buffer = new Buffer(new Array(4097).join(' '))
-      assert.equal(buffer.length, 4096)
-    })
-  })
-
-  describe('process.stdout', function () {
-    it('does not throw an exception when accessed', function () {
-      assert.doesNotThrow(function () {
-        process.stdout
-      })
-    })
-
-    it('does not throw an exception when calling write()', function () {
-      assert.doesNotThrow(function () {
-        process.stdout.write('test')
-      })
-    })
-
-    it('should have isTTY defined on Mac and Linux', function () {
-      if (isCI) return
-
-      if (process.platform === 'win32') {
-        assert.equal(process.stdout.isTTY, undefined)
-      } else {
-        assert.equal(typeof process.stdout.isTTY, 'boolean')
+  describe('net.connect', () => {
+    before(function () {
+      if (!features.isRunAsNodeEnabled() || process.platform !== 'darwin') {
+        this.skip();
       }
-    })
-  })
+    });
 
-  describe('process.stdin', function () {
-    it('does not throw an exception when accessed', function () {
-      assert.doesNotThrow(function () {
-        process.stdin
-      })
-    })
+    it('emit error when connect to a socket path without listeners', (done) => {
+      const socketPath = path.join(os.tmpdir(), 'atom-shell-test.sock');
+      const script = path.join(fixtures, 'module', 'create_socket.js');
+      const child = ChildProcess.fork(script, [socketPath]);
+      child.on('exit', (code) => {
+        expect(code).to.equal(0);
+        const client = require('net').connect(socketPath);
+        client.on('error', (error) => {
+          expect(error.code).to.equal('ECONNREFUSED');
+          done();
+        });
+      });
+    });
+  });
 
-    it('returns null when read from', function () {
-      assert.equal(process.stdin.read(), null)
-    })
-  })
+  describe('Buffer', () => {
+    it('can be created from WebKit external string', () => {
+      const p = document.createElement('p');
+      p.innerText = '闲云潭影日悠悠，物换星移几度秋';
+      const b = Buffer.from(p.innerText);
+      expect(b.toString()).to.equal('闲云潭影日悠悠，物换星移几度秋');
+      expect(Buffer.byteLength(p.innerText)).to.equal(45);
+    });
 
-  describe('process.version', function () {
-    it('should not have -pre', function () {
-      assert(!process.version.endsWith('-pre'))
-    })
-  })
+    it('correctly parses external one-byte UTF8 string', () => {
+      const p = document.createElement('p');
+      p.innerText = 'Jøhänñéß';
+      const b = Buffer.from(p.innerText);
+      expect(b.toString()).to.equal('Jøhänñéß');
+      expect(Buffer.byteLength(p.innerText)).to.equal(13);
+    });
 
-  describe('vm.createContext', function () {
-    it('should not crash', function () {
-      require('vm').runInNewContext('')
-    })
-  })
+    it('does not crash when creating large Buffers', () => {
+      let buffer = Buffer.from(new Array(4096).join(' '));
+      expect(buffer.length).to.equal(4095);
+      buffer = Buffer.from(new Array(4097).join(' '));
+      expect(buffer.length).to.equal(4096);
+    });
+
+    it('does not crash for crypto operations', () => {
+      const crypto = require('crypto');
+      const data = 'lG9E+/g4JmRmedDAnihtBD4Dfaha/GFOjd+xUOQI05UtfVX3DjUXvrS98p7kZQwY3LNhdiFo7MY5rGft8yBuDhKuNNag9vRx/44IuClDhdQ=';
+      const key = 'q90K9yBqhWZnAMCMTOJfPQ==';
+      const cipherText = '{"error_code":114,"error_message":"Tham số không hợp lệ","data":null}';
+      for (let i = 0; i < 10000; ++i) {
+        const iv = Buffer.from('0'.repeat(32), 'hex');
+        const input = Buffer.from(data, 'base64');
+        const decipher = crypto.createDecipheriv('aes-128-cbc', Buffer.from(key, 'base64'), iv);
+        const result = Buffer.concat([decipher.update(input), decipher.final()]).toString('utf8');
+        expect(cipherText).to.equal(result);
+      }
+    });
+  });
+
+  describe('process.stdout', () => {
+    it('does not throw an exception when accessed', () => {
+      expect(() => process.stdout).to.not.throw();
+    });
+
+    it('does not throw an exception when calling write()', () => {
+      expect(() => {
+        process.stdout.write('test');
+      }).to.not.throw();
+    });
+
+    // TODO: figure out why process.stdout.isTTY is true on Darwin but not Linux/Win.
+    ifit(process.platform !== 'darwin')('isTTY should be undefined in the renderer process', function () {
+      expect(process.stdout.isTTY).to.be.undefined();
+    });
+  });
+
+  describe('process.stdin', () => {
+    it('does not throw an exception when accessed', () => {
+      expect(() => process.stdin).to.not.throw();
+    });
+
+    it('returns null when read from', () => {
+      expect(process.stdin.read()).to.be.null();
+    });
+  });
+
+  describe('process.version', () => {
+    it('should not have -pre', () => {
+      expect(process.version.endsWith('-pre')).to.be.false();
+    });
+  });
+
+  describe('vm.runInNewContext', () => {
+    it('should not crash', () => {
+      require('vm').runInNewContext('');
+    });
+  });
+
+  describe('crypto', () => {
+    it('should list the ripemd160 hash in getHashes', () => {
+      expect(require('crypto').getHashes()).to.include('ripemd160');
+    });
+
+    it('should be able to create a ripemd160 hash and use it', () => {
+      const hash = require('crypto').createHash('ripemd160');
+      hash.update('electron-ripemd160');
+      expect(hash.digest('hex')).to.equal('fa7fec13c624009ab126ebb99eda6525583395fe');
+    });
+
+    it('should list aes-{128,256}-cfb in getCiphers', () => {
+      expect(require('crypto').getCiphers()).to.include.members(['aes-128-cfb', 'aes-256-cfb']);
+    });
+
+    it('should be able to create an aes-128-cfb cipher', () => {
+      require('crypto').createCipheriv('aes-128-cfb', '0123456789abcdef', '0123456789abcdef');
+    });
+
+    it('should be able to create an aes-256-cfb cipher', () => {
+      require('crypto').createCipheriv('aes-256-cfb', '0123456789abcdef0123456789abcdef', '0123456789abcdef');
+    });
+
+    it('should list des-ede-cbc in getCiphers', () => {
+      expect(require('crypto').getCiphers()).to.include('des-ede-cbc');
+    });
+
+    it('should be able to create an des-ede-cbc cipher', () => {
+      const key = Buffer.from('0123456789abcdeff1e0d3c2b5a49786', 'hex');
+      const iv = Buffer.from('fedcba9876543210', 'hex');
+      require('crypto').createCipheriv('des-ede-cbc', key, iv);
+    });
+
+    it('should not crash when getting an ECDH key', () => {
+      const ecdh = require('crypto').createECDH('prime256v1');
+      expect(ecdh.generateKeys()).to.be.an.instanceof(Buffer);
+      expect(ecdh.getPrivateKey()).to.be.an.instanceof(Buffer);
+    });
+
+    it('should not crash when generating DH keys or fetching DH fields', () => {
+      const dh = require('crypto').createDiffieHellman('modp15');
+      expect(dh.generateKeys()).to.be.an.instanceof(Buffer);
+      expect(dh.getPublicKey()).to.be.an.instanceof(Buffer);
+      expect(dh.getPrivateKey()).to.be.an.instanceof(Buffer);
+      expect(dh.getPrime()).to.be.an.instanceof(Buffer);
+      expect(dh.getGenerator()).to.be.an.instanceof(Buffer);
+    });
+
+    it('should not crash when creating an ECDH cipher', () => {
+      const crypto = require('crypto');
+      const dh = crypto.createECDH('prime256v1');
+      dh.generateKeys();
+      dh.setPrivateKey(dh.getPrivateKey());
+    });
+  });
 
   it('includes the electron version in process.versions', () => {
-    assert(/^\d+\.\d+\.\d+$/.test(process.versions.electron))
-  })
+    expect(process.versions)
+      .to.have.own.property('electron')
+      .that.is.a('string')
+      .and.matches(/^\d+\.\d+\.\d+(\S*)?$/);
+  });
 
   it('includes the chrome version in process.versions', () => {
-    assert(/^\d+\.\d+\.\d+\.\d+$/.test(process.versions.chrome))
-  })
-})
+    expect(process.versions)
+      .to.have.own.property('chrome')
+      .that.is.a('string')
+      .and.matches(/^\d+\.\d+\.\d+\.\d+$/);
+  });
+});

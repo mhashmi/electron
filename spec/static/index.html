@@ -1,104 +1,96 @@
-<html>
-<head>
-  <meta name="referrer" content="always">
-  <link href="../node_modules/mocha/mocha.css" rel="stylesheet">
-  <script src="jquery-2.0.3.min.js"></script>
-</head>
 <body>
-
-<div id="mocha"></div>
-
+<script src="jquery-2.0.3.min.js"></script>
 <script type="text/javascript" charset="utf-8">
 (function() {
-  // Disable use of deprecated functions.
-  process.throwDeprecation = true;
+  // Deprecated APIs are still supported and should be tested.
+  process.throwDeprecation = false
 
-  var path = require('path');
-  var electron = require ('electron');
-  var remote = electron.remote;
-  var ipcRenderer = electron.ipcRenderer;
+  const path = require('path')
+  const electron = require('electron')
+  const { ipcRenderer } = electron
 
-  // Check if we are running in CI.
-  var isCi = remote.getGlobal('isCi')
-
-  if (!isCi) {
-    var win = remote.getCurrentWindow();
-    win.show();
-    win.focus();
-  }
-
-  // Show DevTools.
-  document.oncontextmenu = function(e) {
-    remote.getCurrentWindow().inspectElement(e.clientX, e.clientY);
-  }
+  // Set up chai-as-promised here first to avoid conflicts
+  // It must be loaded first or really strange things happen inside
+  // chai that cause test failures
+  // DO NOT MOVE, REMOVE OR EDIT THIS LINE
+  require('chai').use(require('chai-as-promised'))
 
   // Rediret all output to browser.
-  if (isCi) {
-    global.__defineGetter__('console', function() {
-      return {
-        log: function() {
-          args = Array.prototype.slice.call(arguments);
-          ipcRenderer.send('console.log', args);
-        },
-        error: function() {
-          args = Array.prototype.slice.call(arguments);
-          ipcRenderer.send('console.error', args);
-        },
-      }
-    });
+  const fakeConsole = {}
+  for (const k in console) {
+    if (console.hasOwnProperty(k) && k !== 'assert') {
+      fakeConsole[k] = (...args) => ipcRenderer.send('console-call', k, args)
+    }
+  }
+  global.__defineGetter__('console', function () {
+    return fakeConsole
+  })
+
+  const Mocha = require('mocha')
+  const mochaOptions = {}
+  if (process.env.MOCHA_REPORTER) {
+    mochaOptions.reporter = process.env.MOCHA_REPORTER
+  }
+  if (process.env.MOCHA_MULTI_REPORTERS) {
+    mochaOptions.reporterOptions = {
+      reporterEnabled: process.env.MOCHA_MULTI_REPORTERS
+    }
+  }
+  const mocha = new Mocha(mochaOptions)
+
+  if (!process.env.MOCHA_REPORTER) {
+    mocha.ui('bdd').reporter('tap')
   }
 
-  var Coverage = require('electabul').Coverage;
+  const mochaTimeout = process.env.MOCHA_TIMEOUT || 30000
+  mocha.timeout(mochaTimeout)
 
-  var Mocha = require('mocha');
+  const query = Mocha.utils.parseQuery(window.location.search || '')
+  if (query.grep) mocha.grep(query.grep)
+  if (query.invert) mocha.invert()
 
-  var mocha = new Mocha();
-
-  mocha.ui('bdd').reporter(isCi ? 'tap' : 'html');
-  mocha.timeout(isCi ? 30000 : 10000)
-
-  var query = Mocha.utils.parseQuery(window.location.search || '');
-  if (query.grep) mocha.grep(query.grep);
-  if (query.invert) mocha.invert();
+  const files = query.files ? query.files.split(',') : undefined
 
   // Read all test files.
-  var walker = require('walkdir').walk(path.dirname(__dirname), {
+  const walker = require('walkdir').walk(path.dirname(__dirname), {
     no_recurse: true
-  });
+  })
 
-  walker.on('file', function(file) {
-    if (/-spec\.js$/.test(file) && !file.includes('api-crash-reporter-spec.js'))
-      mocha.addFile(file);
-  });
+  // This allows you to run specific modules only:
+  // npm run test -match=menu
+  const moduleMatch = process.env.npm_config_match
+    ? new RegExp(process.env.npm_config_match, 'g')
+    : null
 
-  walker.on('end', function() {
-    mocha.addFile(path.resolve(__dirname, '..', 'api-crash-reporter-spec.js'))
-    var runner = mocha.run(function() {
-      if (isCi && runner.hasOnly) {
-        try {
-          throw new Error('A spec contains a call to it.only or describe.only and should be reverted.')
-        } catch (error) {
-          console.error(error.stack || error)
-        }
-        ipcRenderer.send('process.exit', 1)
-        return
+  const testFiles = []
+  walker.on('file', (file) => {
+    if (/-spec\.js$/.test(file) && (!moduleMatch || moduleMatch.test(file))) {
+      testFiles.push(file)
+    }
+  })
+
+  const baseElectronDir = path.resolve(__dirname, '..', '..')
+
+  walker.on('end', () => {
+    testFiles.sort()
+    testFiles.forEach((file) => {
+      if (!files || files.includes(path.relative(baseElectronDir, file))) {
+        mocha.addFile(file)
       }
+    })
 
-      Mocha.utils.highlightTags('code');
+    // Set up chai in the correct order
+    const chai = require('chai')
+    chai.use(require('chai-as-promised'))
+    chai.use(require('dirty-chai'))
 
-      var coverage = new Coverage({
-        libPath: path.join(__dirname, '..', '..', 'lib'),
-        outputPath: path.join(__dirname, '..', '..', 'out', 'coverage'),
-        formats: ['text', 'lcov']
-      });
-      coverage.addCoverage(ipcRenderer.sendSync('get-main-process-coverage'))
-      coverage.generateReport()
-
-      if (isCi)
-        ipcRenderer.send('process.exit', runner.failures);
-    });
-  });
-})();
+    const runner = mocha.run(() => {
+      // Ensure the callback is called after runner is defined
+      setTimeout(() => {
+        ipcRenderer.send('process.exit', runner.failures)
+      }, 0)
+    })
+  })
+})()
 </script>
 </body>
-</html>

@@ -2,7 +2,7 @@
 
 > Define keyboard shortcuts.
 
-Accelerators are Strings that can contain multiple modifiers and key codes,
+Accelerators are Strings that can contain multiple modifiers and a single key code,
 combined by the `+` character, and are used to define keyboard shortcuts
 throughout your application.
 
@@ -16,9 +16,9 @@ using the [`register`](global-shortcut.md#globalshortcutregisteraccelerator-call
 method, i.e.
 
 ```javascript
-const {app, globalShortcut} = require('electron')
+const { app, globalShortcut } = require('electron')
 
-app.on('ready', () => {
+app.whenReady().then(() => {
   // Register a 'CommandOrControl+Y' shortcut listener.
   globalShortcut.register('CommandOrControl+Y', () => {
     // Do stuff when Y and either Command/Control is pressed.
@@ -54,10 +54,13 @@ The `Super` key is mapped to the `Windows` key on Windows and Linux and
 * `0` to `9`
 * `A` to `Z`
 * `F1` to `F24`
-* Punctuations like `~`, `!`, `@`, `#`, `$`, etc.
+* Punctuation like `~`, `!`, `@`, `#`, `$`, etc.
 * `Plus`
 * `Space`
 * `Tab`
+* `Capslock`
+* `Numlock`
+* `Scrolllock`
 * `Backspace`
 * `Delete`
 * `Insert`
@@ -69,3 +72,10 @@ The `Super` key is mapped to the `Windows` key on Windows and Linux and
 * `VolumeUp`, `VolumeDown` and `VolumeMute`
 * `MediaNextTrack`, `MediaPreviousTrack`, `MediaStop` and `MediaPlayPause`
 * `PrintScreen`
+* NumPad Keys
+  * `num0` - `num9`
+  * `numdec` - decimal key
+  * `numadd` - numpad `+` key
+  * `numsub` - numpad `-` key
+  * `nummult` - numpad `*` key
+  * `numdiv` - numpad `÷` key
